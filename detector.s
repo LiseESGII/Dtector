@@ -52,3 +52,35 @@ get_input:
     mov $input_buf, %rdi
     call remove_newline
     ret
+
+# Convertir hex vers binaire (version simplifiée)
+hex_to_bin:
+    mov $input_buf, %rsi    # source
+    mov $binary_buf, %rdi   # destination
+    xor %rcx, %rcx          # compteur bytes
+    
+hex_loop:
+    lodsb                   # charger caractère
+    cmp $0, %al            # fin de chaîne?
+    je hex_done
+    
+    # Ignorer espaces
+    cmp $32, %al           # espace
+    je hex_loop
+    
+    # Convertir premier caractère
+    call char_to_hex
+    shl $4, %al            # décaler 4 bits
+    mov %al, %bl           # sauvegarder
+    
+    # Deuxième caractère
+    lodsb
+    cmp $0, %al
+    je hex_done
+    call char_to_hex
+    or %bl, %al            # combiner
+    
+    # Stocker byte
+    stosb
+    inc %rcx
+    jmp hex_loop
