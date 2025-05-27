@@ -26,3 +26,24 @@ show_banner:
     mov $31, %rdx       # taille
     syscall
     ret
+
+#  Lire l'entrée utilisateur
+get_input:
+    # Afficher prompt
+    mov $1, %rax
+    mov $1, %rdi
+    mov $prompt, %rsi
+    mov $17, %rdx
+    syscall
+    
+    # Lire depuis stdin
+    mov $0, %rax        # read syscall
+    mov $0, %rdi        # stdin
+    mov $input_buf, %rsi # buffer
+    mov $255, %rdx      # taille max
+    syscall
+    
+    # Enlever le \n final
+    mov $input_buf, %rdi
+    call remove_newline
+    ret
