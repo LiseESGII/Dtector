@@ -10,6 +10,11 @@
     danger_msg:     .ascii "[ALERTE] Menace detectee: \0"
     newline:        .ascii "\n\0"
 
+    # Patterns à détecter (simplifiés)
+    # Pattern NOP sled (succession de 0x90)
+    nop_pattern:    .byte 0x90, 0x90, 0x90
+    nop_msg:        .ascii "NOP sled\0"
+
 .section .text
 .global _start
 
