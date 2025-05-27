@@ -23,6 +23,10 @@ _start:
     call show_banner
     call get_input
 
+    # Conversion et analyse
+    call hex_to_bin
+    call scan_threats
+
 # Afficher le banner
 show_banner:
     mov $1, %rax        # write syscall
@@ -84,3 +88,42 @@ hex_loop:
     stosb
     inc %rcx
     jmp hex_loop
+
+hex_done:
+    mov %rcx, %r15         # sauver nombre de bytes
+    ret
+
+#  Convertir caractère vers valeur hex
+char_to_hex:
+    # 0-9
+    cmp $48, %al           # '0'
+    jl char_done
+    cmp $57, %al           # '9'
+    jle sub_zero
+    
+    # A-F
+    cmp $65, %al           # 'A'
+    jl char_done
+    cmp $70, %al           # 'F'
+    jle sub_a
+    
+    # a-f
+    cmp $97, %al           # 'a'
+    jl char_done
+    cmp $102, %al          # 'f'
+    jle sub_a_lower
+
+char_done:
+    ret
+
+sub_zero:
+    sub $48, %al           # '0' = 48
+    ret
+
+sub_a:
+    sub $55, %al           # 'A' = 65, -55 = 10
+    ret
+
+sub_a_lower:
+    sub $87, %al           # 'a' = 97, -87 = 10
+    ret
