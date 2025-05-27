@@ -44,14 +44,14 @@ get_input:
     mov $prompt, %rsi
     mov $17, %rdx
     syscall
-    
+
     # Lire depuis stdin
     mov $0, %rax        # read syscall
     mov $0, %rdi        # stdin
     mov $input_buf, %rsi # buffer
     mov $255, %rdx      # taille max
     syscall
-    
+
     # Enlever le \n final
     mov $input_buf, %rdi
     call remove_newline
@@ -62,28 +62,28 @@ hex_to_bin:
     mov $input_buf, %rsi    # source
     mov $binary_buf, %rdi   # destination
     xor %rcx, %rcx          # compteur bytes
-    
+
 hex_loop:
     lodsb                   # charger caractère
     cmp $0, %al            # fin de chaîne?
     je hex_done
-    
+
     # Ignorer espaces
     cmp $32, %al           # espace
     je hex_loop
-    
+
     # Convertir premier caractère
     call char_to_hex
     shl $4, %al            # décaler 4 bits
     mov %al, %bl           # sauvegarder
-    
+
     # Deuxième caractère
     lodsb
     cmp $0, %al
     je hex_done
     call char_to_hex
     or %bl, %al            # combiner
-    
+
     # Stocker byte
     stosb
     inc %rcx
@@ -100,13 +100,13 @@ char_to_hex:
     jl char_done
     cmp $57, %al           # '9'
     jle sub_zero
-    
+
     # A-F
     cmp $65, %al           # 'A'
     jl char_done
     cmp $70, %al           # 'F'
     jle sub_a
-    
+
     # a-f
     cmp $97, %al           # 'a'
     jl char_done
@@ -126,4 +126,51 @@ sub_a:
 
 sub_a_lower:
     sub $87, %al           # 'a' = 97, -87 = 10
+    ret
+
+# Scanner les menaces
+scan_threats:
+    mov $0, threat_count   # reset compteur
+
+    # Chercher NOP sled
+    call find_nop_sled
+
+    # Chercher syscalls
+    call find_syscalls
+
+    ret
+
+# Détecter NOP sled
+find_nop_sled:
+    mov $binary_buf, %rsi  # début buffer
+    mov %r15, %rcx         # nombre de bytes
+    sub $2, %rcx           # ajuster pour pattern de 3
+
+nop_scan:
+    cmp $0, %rcx
+    je nop_done
+
+    # Vérifier 3 bytes NOP consécutifs
+    movb (%rsi), %al
+    cmp $0x90, %al
+    jne nop_next
+
+    movb 1(%rsi), %al
+    cmp $0x90, %al
+    jne nop_next
+
+    movb 2(%rsi), %al
+    cmp $0x90, %al
+    jne nop_next
+
+    # NOP trouvé!
+    incq threat_count
+    call report_nop
+
+nop_next:
+    inc %rsi
+    dec %rcx
+    jmp nop_scan
+
+nop_done:
     ret
