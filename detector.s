@@ -39,6 +39,11 @@ _start:
     # Résultats
     call show_results
 
+    # Sortie programme
+    mov $60, %rax
+    mov $0, %rdi
+    syscall
+
 # Afficher le banner
 show_banner:
     mov $1, %rax        # write syscall
@@ -253,6 +258,29 @@ report_syscall:
     mov $15, %rdx
     syscall
 
+    mov $1, %rax
+    mov $1, %rdi
+    mov $newline, %rsi
+    mov $1, %rdx
+    syscall
+    ret
+
+# Afficher résultats finaux
+show_results:
+    mov threat_count, %rax
+    cmp $0, %rax
+    jne threats_found
+
+    # Aucune menace
+    mov $1, %rax
+    mov $1, %rdi
+    mov $safe_msg, %rsi
+    mov $19, %rdx
+    syscall
+    ret
+
+threats_found:
+    # Afficher nombre de menaces (simple)
     mov $1, %rax
     mov $1, %rdi
     mov $newline, %rsi
