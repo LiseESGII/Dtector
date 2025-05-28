@@ -1,289 +1,273 @@
-# Analyseur de Shellcode
-# Architecture: x86-64 Linux
-# Objectif: Détecter des patterns malveillants dans du shellcode
+; Analyseur de Shellcode
+; Architecture: x86-64 Linux
+; Objectif: Détecter des patterns malveillants dans du shellcode
 
-.section .data
-    # Messages de base
-    banner:         .ascii "=== DETECTEUR DE SHELLCODE ===\n\0"
-    prompt:         .ascii "Shellcode (hex): \0"
-    safe_msg:       .ascii "[OK] Code semble sain\n\0"
-    danger_msg:     .ascii "[ALERTE] Menace detectee: \0"
-    newline:        .ascii "\n\0"
+section .data
 
-    # Patterns à détecter
-    # Pattern NOP sled (succession de 0x90)
-    nop_pattern:    .byte 0x90, 0x90, 0x90
-    nop_msg:        .ascii "NOP sled\0"
+banner:        db "=== DETECTEUR DE SHELLCODE ===",10,0
+prompt:        db "Shellcode (hex): ",0
+safe_msg:      db "[OK] Code semble sain",10,0
+danger_msg:    db "[ALERTE] Menace detectee: ",0
+newline:       db 10,0
 
-    # Pattern syscall (0x0f 0x05)
-    syscall_pattern: .byte 0x0f, 0x05
-    syscall_msg:    .ascii "Syscall suspect\0"
+nop_pattern:   db 0x90, 0x90, 0x90
+nop_msg:       db "NOP sled",0
 
-    # Buffers et compteurs
-    input_buf:      .space 256    # Buffer d'entrée
-    binary_buf:     .space 128    # Buffer binaire
-    threat_count:   .quad 0       # Compteur de menaces
+syscall_pattern: db 0x0f, 0x05
+syscall_msg:   db "Syscall suspect",0
 
-.section .text
-.global _start
+input_buf:     times 256 db 0
+binary_buf:    times 128 db 0
+threat_count:  dq 0
+
+section .bss
+; (rien ici, tout est déjà alloué dans .data)
+
+section .text
+global _start
 
 _start:
-    # Affichage et lecture
+    ; Affichage et lecture
     call show_banner
     call get_input
 
-    # Conversion et analyse
+    ; Conversion et analyse
     call hex_to_bin
     call scan_threats
 
-    # Résultats
+    ; Résultats
     call show_results
 
-    # Sortie programme
-    mov $60, %rax
-    mov $0, %rdi
+    ; Sortie programme
+    mov rax, 60
+    mov rdi, 0
     syscall
 
-# Afficher le banner
+; Afficher le banner
 show_banner:
-    mov $1, %rax        # write syscall
-    mov $1, %rdi        # stdout
-    mov $banner, %rsi   # message
-    mov $31, %rdx       # taille
+    mov rax, 1          ; write syscall
+    mov rdi, 1          ; stdout
+    mov rsi, banner
+    mov rdx, 31
     syscall
     ret
 
-#  Lire l'entrée utilisateur
+; Lire l'entrée utilisateur
 get_input:
-    # Afficher prompt
-    mov $1, %rax
-    mov $1, %rdi
-    mov $prompt, %rsi
-    mov $17, %rdx
+    ; Afficher prompt
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, prompt
+    mov rdx, 17
     syscall
 
-    # Lire depuis stdin
-    mov $0, %rax        # read syscall
-    mov $0, %rdi        # stdin
-    mov $input_buf, %rsi # buffer
-    mov $255, %rdx      # taille max
+    ; Lire depuis stdin
+    mov rax, 0          ; read syscall
+    mov rdi, 0          ; stdin
+    mov rsi, input_buf
+    mov rdx, 255
     syscall
 
-    # Enlever le \n final
-    mov $input_buf, %rdi
+    ; Enlever le \n final
+    mov rdi, input_buf
     call remove_newline
     ret
 
-# Convertir hex vers binaire (version simplifiée)
+; Convertir hex vers binaire (version simplifiée)
 hex_to_bin:
-    mov $input_buf, %rsi    # source
-    mov $binary_buf, %rdi   # destination
-    xor %rcx, %rcx          # compteur bytes
+    mov rsi, input_buf      ; source
+    mov rdi, binary_buf     ; destination
+    xor rcx, rcx            ; compteur bytes
 
 hex_loop:
-    lodsb                   # charger caractère
-    cmp $0, %al            # fin de chaîne?
+    lodsb                   ; charger caractère (rsi->al, rsi++)
+    cmp al, 0
     je hex_done
 
-    # Ignorer espaces
-    cmp $32, %al           # espace
+    ; Ignorer espaces
+    cmp al, 32
     je hex_loop
 
-    # Convertir premier caractère
+    ; Convertir premier caractère
     call char_to_hex
-    shl $4, %al            # décaler 4 bits
-    mov %al, %bl           # sauvegarder
+    shl al, 4
+    mov bl, al              ; sauvegarder
 
-    # Deuxième caractère
+    ; Deuxième caractère
     lodsb
-    cmp $0, %al
+    cmp al, 0
     je hex_done
     call char_to_hex
-    or %bl, %al            # combiner
+    or al, bl
 
-    # Stocker byte
-    stosb
-    inc %rcx
+    ; Stocker byte
+    stosb                   ; al -> [rdi], rdi++
+    inc rcx
     jmp hex_loop
 
 hex_done:
-    mov %rcx, %r15         # sauver nombre de bytes
+    mov r15, rcx            ; sauver nombre de bytes
     ret
 
-#  Convertir caractère vers valeur hex
+; Convertir caractère vers valeur hex
 char_to_hex:
-    # 0-9
-    cmp $48, %al           # '0'
+    ; 0-9
+    cmp al, '0'
     jl char_done
-    cmp $57, %al           # '9'
+    cmp al, '9'
     jle sub_zero
-
-    # A-F
-    cmp $65, %al           # 'A'
+    ; A-F
+    cmp al, 'A'
     jl char_done
-    cmp $70, %al           # 'F'
+    cmp al, 'F'
     jle sub_a
-
-    # a-f
-    cmp $97, %al           # 'a'
+    ; a-f
+    cmp al, 'a'
     jl char_done
-    cmp $102, %al          # 'f'
+    cmp al, 'f'
     jle sub_a_lower
-
 char_done:
     ret
-
 sub_zero:
-    sub $48, %al           # '0' = 48
+    sub al, '0'
     ret
-
 sub_a:
-    sub $55, %al           # 'A' = 65, -55 = 10
+    sub al, 55      ; 'A' = 65, -55 = 10
     ret
-
 sub_a_lower:
-    sub $87, %al           # 'a' = 97, -87 = 10
+    sub al, 87      ; 'a' = 97, -87 = 10
     ret
 
-# Scanner les menaces
+; Scanner les menaces
 scan_threats:
-    mov $0, threat_count   # reset compteur
-
-    # Chercher NOP sled
+    mov qword [threat_count], 0     ; reset compteur
     call find_nop_sled
-
-    # Chercher syscalls
     call find_syscalls
-
     ret
 
-# Détecter NOP sled
+; Détecter NOP sled
 find_nop_sled:
-    mov $binary_buf, %rsi  # début buffer
-    mov %r15, %rcx         # nombre de bytes
-    sub $2, %rcx           # ajuster pour pattern de 3
-
+    mov rsi, binary_buf
+    mov rcx, r15
+    sub rcx, 2
 nop_scan:
-    cmp $0, %rcx
+    cmp rcx, 0
     je nop_done
-
-    # Vérifier 3 bytes NOP consécutifs
-    movb (%rsi), %al
-    cmp $0x90, %al
+    mov al, [rsi]
+    cmp al, 0x90
     jne nop_next
-
-    movb 1(%rsi), %al
-    cmp $0x90, %al
+    mov al, [rsi+1]
+    cmp al, 0x90
     jne nop_next
-
-    movb 2(%rsi), %al
-    cmp $0x90, %al
+    mov al, [rsi+2]
+    cmp al, 0x90
     jne nop_next
-
-    # NOP trouvé!
-    incq threat_count
+    ; NOP trouvé !
+    inc qword [threat_count]
     call report_nop
-
 nop_next:
-    inc %rsi
-    dec %rcx
+    inc rsi
+    dec rcx
     jmp nop_scan
-
 nop_done:
     ret
 
-# Détecter syscalls
+; Détecter syscalls
 find_syscalls:
-    mov $binary_buf, %rsi
-    mov %r15, %rcx
-    dec %rcx               # ajuster pour pattern de 2
-
+    mov rsi, binary_buf
+    mov rcx, r15
+    dec rcx
 syscall_scan:
-    cmp $0, %rcx
+    cmp rcx, 0
     je syscall_done
-
-    # Vérifier pattern 0x0f 0x05
-    movb (%rsi), %al
-    cmp $0x0f, %al
+    mov al, [rsi]
+    cmp al, 0x0f
     jne syscall_next
-
-    movb 1(%rsi), %al
-    cmp $0x05, %al
+    mov al, [rsi+1]
+    cmp al, 0x05
     jne syscall_next
-
-    # Syscall trouvé!
-    incq threat_count
+    ; Syscall trouvé !
+    inc qword [threat_count]
     call report_syscall
-
 syscall_next:
-    inc %rsi
-    dec %rcx
+    inc rsi
+    dec rcx
     jmp syscall_scan
-
 syscall_done:
     ret
 
-# Signaler NOP sled
+; Signaler NOP sled
 report_nop:
-    mov $1, %rax
-    mov $1, %rdi
-    mov $danger_msg, %rsi
-    mov $25, %rdx
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, danger_msg
+    mov rdx, 25
     syscall
 
-    mov $1, %rax
-    mov $1, %rdi
-    mov $nop_msg, %rsi
-    mov $8, %rdx
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, nop_msg
+    mov rdx, 8
     syscall
 
-    mov $1, %rax
-    mov $1, %rdi
-    mov $newline, %rsi
-    mov $1, %rdx
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
     syscall
     ret
 
-# Signaler syscall
+; Signaler syscall
 report_syscall:
-    mov $1, %rax
-    mov $1, %rdi
-    mov $danger_msg, %rsi
-    mov $25, %rdx
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, danger_msg
+    mov rdx, 25
     syscall
 
-    mov $1, %rax
-    mov $1, %rdi
-    mov $syscall_msg, %rsi
-    mov $15, %rdx
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, syscall_msg
+    mov rdx, 15
     syscall
 
-    mov $1, %rax
-    mov $1, %rdi
-    mov $newline, %rsi
-    mov $1, %rdx
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
     syscall
     ret
 
-# Afficher résultats finaux
+; Afficher résultats finaux
 show_results:
-    mov threat_count, %rax
-    cmp $0, %rax
+    mov rax, [threat_count]
+    cmp rax, 0
     jne threats_found
-
-    # Aucune menace
-    mov $1, %rax
-    mov $1, %rdi
-    mov $safe_msg, %rsi
-    mov $19, %rdx
+    ; Aucune menace
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, safe_msg
+    mov rdx, 19
+    syscall
+    ret
+threats_found:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
     syscall
     ret
 
-threats_found:
-    # Afficher nombre de menaces (simple)
-    mov $1, %rax
-    mov $1, %rdi
-    mov $newline, %rsi
-    mov $1, %rdx
-    syscall
+; Enlever newline
+remove_newline:
+    mov al, [rdi]
+    cmp al, 0
+    je remove_done
+    cmp al, 10
+    je replace_null
+    inc rdi
+    jmp remove_newline
+replace_null:
+    mov byte [rdi], 0
+remove_done:
     ret
