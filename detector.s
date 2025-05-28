@@ -19,6 +19,11 @@
     syscall_pattern: .byte 0x0f, 0x05
     syscall_msg:    .ascii "Syscall suspect\0"
 
+    # Buffers et compteurs
+    input_buf:      .space 256    # Buffer d'entrée
+    binary_buf:     .space 128    # Buffer binaire
+    threat_count:   .quad 0       # Compteur de menaces
+
 .section .text
 .global _start
 
@@ -30,6 +35,9 @@ _start:
     # Conversion et analyse
     call hex_to_bin
     call scan_threats
+
+    # Résultats
+    call show_results
 
 # Afficher le banner
 show_banner:
@@ -208,4 +216,25 @@ syscall_next:
     jmp syscall_scan
 
 syscall_done:
+    ret
+
+# Signaler NOP sled
+report_nop:
+    mov $1, %rax
+    mov $1, %rdi
+    mov $danger_msg, %rsi
+    mov $25, %rdx
+    syscall
+
+    mov $1, %rax
+    mov $1, %rdi
+    mov $nop_msg, %rsi
+    mov $8, %rdx
+    syscall
+
+    mov $1, %rax
+    mov $1, %rdi
+    mov $newline, %rsi
+    mov $1, %rdx
+    syscall
     ret
