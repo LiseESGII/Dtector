@@ -238,3 +238,24 @@ report_nop:
     mov $1, %rdx
     syscall
     ret
+
+# Signaler syscall
+report_syscall:
+    mov $1, %rax
+    mov $1, %rdi
+    mov $danger_msg, %rsi
+    mov $25, %rdx
+    syscall
+
+    mov $1, %rax
+    mov $1, %rdi
+    mov $syscall_msg, %rsi
+    mov $15, %rdx
+    syscall
+
+    mov $1, %rax
+    mov $1, %rdi
+    mov $newline, %rsi
+    mov $1, %rdx
+    syscall
+    ret
