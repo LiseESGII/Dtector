@@ -10,10 +10,14 @@
     danger_msg:     .ascii "[ALERTE] Menace detectee: \0"
     newline:        .ascii "\n\0"
 
-    # Patterns à détecter (simplifiés)
+    # Patterns à détecter
     # Pattern NOP sled (succession de 0x90)
     nop_pattern:    .byte 0x90, 0x90, 0x90
     nop_msg:        .ascii "NOP sled\0"
+
+    # Pattern syscall (0x0f 0x05)
+    syscall_pattern: .byte 0x0f, 0x05
+    syscall_msg:    .ascii "Syscall suspect\0"
 
 .section .text
 .global _start
@@ -173,4 +177,35 @@ nop_next:
     jmp nop_scan
 
 nop_done:
+    ret
+
+# Détecter syscalls
+find_syscalls:
+    mov $binary_buf, %rsi
+    mov %r15, %rcx
+    dec %rcx               # ajuster pour pattern de 2
+
+syscall_scan:
+    cmp $0, %rcx
+    je syscall_done
+
+    # Vérifier pattern 0x0f 0x05
+    movb (%rsi), %al
+    cmp $0x0f, %al
+    jne syscall_next
+
+    movb 1(%rsi), %al
+    cmp $0x05, %al
+    jne syscall_next
+
+    # Syscall trouvé!
+    incq threat_count
+    call report_syscall
+
+syscall_next:
+    inc %rsi
+    dec %rcx
+    jmp syscall_scan
+
+syscall_done:
     ret
